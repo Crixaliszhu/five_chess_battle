@@ -1,17 +1,37 @@
 {
-    "setting": {
-        "es6": true,
-        "postcss": false,
-        "minified": false,
-        "enhance": false,
-        "useCompilerPlugins": false
-    },
-    "compileType": "game",
-    "appid": "wxca540d501c56adca",
-    "projectname": "五子棋对战",
-    "simulatorPluginLibVersion": {},
-    "packOptions": {
-        "ignore": [],
-        "include": []
+  "setting": {
+    "es6": true,
+    "postcss": false,
+    "minified": false,
+    "enhance": false,
+    "useCompilerPlugins": false,
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "condition": false,
+    "swc": false,
+    "disableSWC": true,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
     }
+  },
+  "compileType": "game",
+  "appid": "wxca540d501c56adca",
+  "projectname": "五子棋对战",
+  "simulatorPluginLibVersion": {},
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "libVersion": "3.15.2",
+  "isGameTourist": false,
+  "editorSetting": {}
 }
