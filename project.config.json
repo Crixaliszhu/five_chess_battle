@@ -1,0 +1,17 @@
+{
+    "setting": {
+        "es6": true,
+        "postcss": false,
+        "minified": false,
+        "enhance": false,
+        "useCompilerPlugins": false
+    },
+    "compileType": "game",
+    "appid": "wxca540d501c56adca",
+    "projectname": "五子棋对战",
+    "simulatorPluginLibVersion": {},
+    "packOptions": {
+        "ignore": [],
+        "include": []
+    }
+}
