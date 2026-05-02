@@ -13,6 +13,7 @@ canvas.height = H
 const ctx = canvas.getContext('2d')
 
 // ========== 游戏状态 ==========
+let showMainMenu = true  // 是否显示主界面
 let board = []
 let history = []
 let gameOver = false
@@ -38,6 +39,10 @@ function initBoard() {
 
 // ========== 渲染 ==========
 function render() {
+  if (showMainMenu) {
+    renderer.drawMainMenu()
+    return
+  }
   renderer.draw(board, currentTurn, playerColor, diffLabels[difficulty], gameOver)
   if (showModal) renderer.drawModal(difficulty, playerFirst)
   else if (showResult) renderer.drawResult(resultText)
@@ -128,6 +133,16 @@ wx.onTouchStart((e) => {
   const touch = e.touches[0]
   const x = touch.clientX, y = touch.clientY
 
+  // 主界面交互
+  if (showMainMenu) {
+    if (renderer.mainMenuBtn && renderer.hitTest(x, y, renderer.mainMenuBtn)) {
+      showMainMenu = false
+      showModal = true
+      render()
+    }
+    return
+  }
+
   // 弹窗交互
   if (showModal) {
     handleModalTouch(x, y)
@@ -200,11 +215,10 @@ function handleModalTouch(x, y) {
 function handleFooterBtn(id) {
   switch (id) {
     case 'exit':
-      wx.showModal({
-        title: '退出游戏',
-        content: '确定要退出吗？',
-        success: (res) => { if (res.confirm) wx.exitMiniProgram() }
-      })
+      showMainMenu = true
+      showModal = false
+      showResult = false
+      render()
       break
     case 'undo':
       undo()

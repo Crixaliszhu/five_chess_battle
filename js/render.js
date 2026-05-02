@@ -383,6 +383,74 @@ export default class Renderer {
     ctx.closePath()
   }
 
+  drawMainMenu() {
+    const ctx = this.ctx
+    const W = this.W, H = this.H
+    ctx.clearRect(0, 0, W, H)
+
+    const grad = ctx.createLinearGradient(0, 0, 0, H)
+    grad.addColorStop(0, '#2c1810')
+    grad.addColorStop(1, '#1a0f0a')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, W, H)
+
+    ctx.fillStyle = '#d4a843'
+    ctx.font = 'bold 18px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('今日小游戏', W / 2, H * 0.08)
+
+    const titleY = H * 0.25
+    ctx.fillStyle = '#f5c842'
+    ctx.font = 'bold 36px sans-serif'
+    ctx.fillText('趣味五子棋', W / 2, titleY)
+
+    const subtitleY = H * 0.33
+    ctx.fillStyle = '#c9a453'
+    ctx.font = '18px sans-serif'
+    ctx.fillText('动脑益智 乐在棋中', W / 2, subtitleY)
+
+    const btnY = H * 0.52
+    const btnW = W * 0.7
+    const btnH = 56
+    const btnX = (W - btnW) / 2
+    const grad2 = ctx.createLinearGradient(btnX, btnY, btnX, btnY + btnH)
+    grad2.addColorStop(0, '#4a9c2d')
+    grad2.addColorStop(1, '#2d6a1a')
+    ctx.fillStyle = grad2
+    this._roundRect(btnX, btnY, btnW, btnH, 28)
+    ctx.fill()
+    ctx.strokeStyle = '#6bc23a'
+    ctx.lineWidth = 2
+    this._roundRect(btnX, btnY, btnW, btnH, 28)
+    ctx.stroke()
+    ctx.fillStyle = '#fff'
+    ctx.font = 'bold 22px sans-serif'
+    ctx.fillText('五子棋对战', W / 2, btnY + btnH / 2 + 2)
+
+    this.mainMenuBtn = { x: btnX, y: btnY, w: btnW, h: btnH }
+
+    const btn2Y = H * 0.65
+    ctx.fillStyle = '#3a2a1a'
+    this._roundRect(btnX, btn2Y, btnW, btnH, 28)
+    ctx.fill()
+    ctx.strokeStyle = '#5a4a3a'
+    ctx.lineWidth = 2
+    this._roundRect(btnX, btn2Y, btnW, btnH, 28)
+    ctx.stroke()
+    ctx.fillStyle = '#a89070'
+    ctx.font = 'bold 20px sans-serif'
+    ctx.fillText('更多游戏', W / 2, btn2Y + btnH / 2 + 2)
+
+    this.moreGamesBtn = { x: btnX, y: btn2Y, w: btnW, h: btnH }
+
+    const footerY = H * 0.85
+    ctx.fillStyle = '#4a3020'
+    ctx.fillRect(0, footerY - 15, W, 50)
+    ctx.fillStyle = '#8a7a6a'
+    ctx.font = '14px sans-serif'
+    ctx.fillText('每日挑战 乐在其中', W / 2, footerY + 5)
+  }
+
   // 将屏幕坐标转换为棋盘格子坐标
   screenToBoard(x, y) {
     const c = Math.round((x - this.boardX - this.padding) / this.cell)
