@@ -5,15 +5,19 @@ export default class Renderer {
   constructor(canvas, ctx) {
     this.canvas = canvas
     this.ctx = ctx
-    this.W = canvas.width
-    this.H = canvas.height
+    this.resize(canvas.width, canvas.height)
+    this.lastPos = null  // 最后落子位置，用于高亮
+  }
+
+  resize(width, height) {
+    this.W = width
+    this.H = height
     // 棋盘区域
     this.boardSize = Math.min(this.W, this.H) * 0.88
     this.padding = this.boardSize * 0.045
     this.cell = (this.boardSize - this.padding * 2) / (BOARD_SIZE - 1)
     this.boardX = (this.W - this.boardSize) / 2
     this.boardY = this.H * 0.16
-    this.lastPos = null  // 最后落子位置，用于高亮
   }
 
   // 全量重绘
@@ -409,9 +413,9 @@ export default class Renderer {
     ctx.font = '18px sans-serif'
     ctx.fillText('动脑益智 乐在棋中', W / 2, subtitleY)
 
-    const btnY = H * 0.52
+    const btnY = H * 0.45
     const btnW = W * 0.7
-    const btnH = 56
+    const btnH = 50
     const btnX = (W - btnW) / 2
     const grad2 = ctx.createLinearGradient(btnX, btnY, btnX, btnY + btnH)
     grad2.addColorStop(0, '#4a9c2d')
@@ -429,19 +433,36 @@ export default class Renderer {
 
     this.mainMenuBtn = { x: btnX, y: btnY, w: btnW, h: btnH }
 
-    const btn2Y = H * 0.65
-    ctx.fillStyle = '#3a2a1a'
+    const btn2Y = btnY + btnH + 18
+    const grad3 = ctx.createLinearGradient(btnX, btn2Y, btnX, btn2Y + btnH)
+    grad3.addColorStop(0, '#3d83d8')
+    grad3.addColorStop(1, '#1d4e9d')
+    ctx.fillStyle = grad3
     this._roundRect(btnX, btn2Y, btnW, btnH, 28)
     ctx.fill()
-    ctx.strokeStyle = '#5a4a3a'
+    ctx.strokeStyle = '#79b7ff'
     ctx.lineWidth = 2
     this._roundRect(btnX, btn2Y, btnW, btnH, 28)
     ctx.stroke()
-    ctx.fillStyle = '#a89070'
+    ctx.fillStyle = '#fff'
     ctx.font = 'bold 20px sans-serif'
-    ctx.fillText('更多游戏', W / 2, btn2Y + btnH / 2 + 2)
+    ctx.fillText('单机斗地主', W / 2, btn2Y + btnH / 2 + 2)
 
-    this.moreGamesBtn = { x: btnX, y: btn2Y, w: btnW, h: btnH }
+    this.landlordMenuBtn = { x: btnX, y: btn2Y, w: btnW, h: btnH }
+
+    const btn3Y = btn2Y + btnH + 18
+    ctx.fillStyle = '#3a2a1a'
+    this._roundRect(btnX, btn3Y, btnW, btnH, 28)
+    ctx.fill()
+    ctx.strokeStyle = '#5a4a3a'
+    ctx.lineWidth = 2
+    this._roundRect(btnX, btn3Y, btnW, btnH, 28)
+    ctx.stroke()
+    ctx.fillStyle = '#a89070'
+    ctx.font = 'bold 18px sans-serif'
+    ctx.fillText('更多游戏', W / 2, btn3Y + btnH / 2 + 2)
+
+    this.moreGamesBtn = { x: btnX, y: btn3Y, w: btnW, h: btnH }
 
     const footerY = H * 0.85
     ctx.fillStyle = '#4a3020'
@@ -449,6 +470,373 @@ export default class Renderer {
     ctx.fillStyle = '#8a7a6a'
     ctx.font = '14px sans-serif'
     ctx.fillText('每日挑战 乐在其中', W / 2, footerY + 5)
+  }
+
+  drawLandlordStart() {
+    const ctx = this.ctx
+    const W = this.W, H = this.H
+    ctx.clearRect(0, 0, W, H)
+    this._drawLandlordBg()
+    this._drawLandlordTopBar(true)
+
+    const cardW = Math.min(86, W * 0.08)
+    const cardH = cardW * 1.35
+    const groupW = cardW * 2 + 24
+    const gx = (W - groupW) / 2
+    const gy = H * 0.18
+    ctx.fillStyle = 'rgba(13,35,88,0.58)'
+    this._roundRect(gx - 20, gy - 16, groupW + 40, cardH + 34, 10)
+    ctx.fill()
+    this._drawFeatureCard(gx, gy, cardW, cardH, 'x2', '积分翻倍')
+    this._drawFeatureCard(gx + cardW + 24, gy, cardW, cardH, '♣', '记牌器')
+
+    const btnW = W * 0.18
+    const btnH = H * 0.12
+    const btnX = (W - btnW) / 2
+    const btnY = H * 0.55
+    const grad = ctx.createLinearGradient(btnX, btnY, btnX, btnY + btnH)
+    grad.addColorStop(0, '#67d487')
+    grad.addColorStop(1, '#2a9f58')
+    ctx.fillStyle = grad
+    this._roundRect(btnX, btnY, btnW, btnH, 8)
+    ctx.fill()
+    ctx.strokeStyle = '#8af2a6'
+    ctx.lineWidth = 2
+    this._roundRect(btnX, btnY, btnW, btnH, 8)
+    ctx.stroke()
+    ctx.fillStyle = '#fff'
+    ctx.font = `bold ${Math.max(22, H * 0.06)}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('开始游戏', W / 2, btnY + btnH / 2)
+
+    ctx.fillStyle = 'rgba(16,34,76,0.45)'
+    ctx.font = `${Math.max(14, H * 0.035)}px sans-serif`
+    ctx.fillText('经典玩法', W / 2, btnY + btnH + 48)
+    this.landlordStartBtn = { x: btnX, y: btnY, w: btnW, h: btnH }
+    this.landlordBackBtn = { x: W * 0.055, y: H * 0.05, w: 64, h: 48 }
+  }
+
+  drawLandlordGame(state) {
+    const ctx = this.ctx
+    const W = this.W, H = this.H
+    ctx.clearRect(0, 0, W, H)
+    this._drawLandlordBg()
+    this.landlordActionBtns = []
+    this.landlordHandRects = []
+
+    this._drawLandlordPlayers(state)
+    this._drawBottomCards(state.bottomCards, state.phase !== 'call')
+
+    if (state.phase === 'call') this._drawCalling(state)
+    if (state.phase === 'play') this._drawPlayHud(state)
+
+    this._drawHand(state.hands[0], state.selected)
+    if (state.phase === 'result') this._drawLandlordResult(state)
+    this._drawLandlordTopBar(false)
+  }
+
+  _drawLandlordBg() {
+    const ctx = this.ctx
+    const W = this.W, H = this.H
+    const grad = ctx.createLinearGradient(0, 0, W, H)
+    grad.addColorStop(0, '#213976')
+    grad.addColorStop(0.55, '#315da8')
+    grad.addColorStop(1, '#172a63')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, W, H)
+    ctx.fillStyle = 'rgba(255,255,255,0.035)'
+    for (let i = -W; i < W * 1.4; i += 28) {
+      ctx.beginPath()
+      ctx.moveTo(i, 0)
+      ctx.lineTo(i + W * 0.45, H)
+      ctx.lineWidth = 8
+      ctx.strokeStyle = 'rgba(255,255,255,0.025)'
+      ctx.stroke()
+    }
+    ctx.fillStyle = 'rgba(12,26,65,0.25)'
+    ctx.font = `bold ${Math.max(30, H * 0.1)}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('斗地主', W / 2, H * 0.38)
+    ctx.font = `${Math.max(18, H * 0.05)}px sans-serif`
+    ctx.fillText('经典玩法', W / 2, H * 0.47)
+  }
+
+  _drawLandlordTopBar(showBack) {
+    const ctx = this.ctx
+    const W = this.W, H = this.H
+    const x = W * 0.035
+    const y = H * 0.045
+    const w = Math.max(74, W * 0.08)
+    const h = Math.max(34, H * 0.075)
+    ctx.fillStyle = 'rgba(12,29,70,0.58)'
+    this._roundRect(x, y, w, h, 18)
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(255,255,255,0.32)'
+    ctx.lineWidth = 1
+    this._roundRect(x, y, w, h, 18)
+    ctx.stroke()
+    ctx.fillStyle = '#f4d85a'
+    ctx.font = `bold ${Math.max(18, H * 0.04)}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(showBack ? '返回' : '退出', x + w / 2, y + h / 2)
+    this.landlordExitBtn = { x, y, w, h }
+  }
+
+  _drawFeatureCard(x, y, w, h, mark, label) {
+    const ctx = this.ctx
+    ctx.fillStyle = '#fff6dd'
+    this._roundRect(x, y, w, h, 8)
+    ctx.fill()
+    ctx.fillStyle = '#56a988'
+    this._roundRect(x + w * 0.18, y + h * 0.1, w * 0.64, w * 0.64, 8)
+    ctx.fill()
+    ctx.fillStyle = mark === 'x2' ? '#ffd33d' : '#ffffff'
+    ctx.font = `bold ${w * 0.34}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(mark, x + w / 2, y + h * 0.35)
+    ctx.fillStyle = '#5c3a1e'
+    ctx.font = `bold ${w * 0.18}px sans-serif`
+    ctx.fillText(label, x + w / 2, y + h * 0.72)
+    ctx.fillStyle = '#278ec8'
+    this._roundRect(x + w * 0.13, y + h * 0.79, w * 0.74, h * 0.14, 16)
+    ctx.fill()
+    ctx.fillStyle = '#fff'
+    ctx.font = `bold ${w * 0.16}px sans-serif`
+    ctx.fillText('免费使用', x + w / 2, y + h * 0.86)
+  }
+
+  _drawLandlordPlayers(state) {
+    const ctx = this.ctx
+    const W = this.W, H = this.H
+    const left = { x: W * 0.075, y: H * 0.29, name: 'AI左', id: 1 }
+    const right = { x: W * 0.925, y: H * 0.29, name: 'AI右', id: 2 }
+    ;[left, right].forEach(p => {
+      const active = state.currentPlayer === p.id && state.phase === 'play'
+      ctx.globalAlpha = active ? 1 : 0.9
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, H * 0.075, 0, Math.PI * 2)
+      ctx.fillStyle = p.id === state.landlord ? '#bd6a28' : '#f1d7b4'
+      ctx.fill()
+      ctx.strokeStyle = active ? '#f5d454' : 'rgba(255,255,255,0.6)'
+      ctx.lineWidth = active ? 4 : 2
+      ctx.stroke()
+      ctx.fillStyle = '#4b250d'
+      ctx.font = `bold ${H * 0.048}px sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(p.id === state.landlord ? '地' : '农', p.x, p.y)
+      ctx.globalAlpha = 1
+
+      const countX = p.id === 1 ? p.x + H * 0.09 : p.x - H * 0.12
+      this._drawCardBack(countX, p.y + H * 0.01, H * 0.048, H * 0.07)
+      ctx.fillStyle = '#fff'
+      ctx.font = `bold ${H * 0.035}px sans-serif`
+      ctx.fillText(String(state.hands[p.id].length), countX, p.y + H * 0.012)
+      if (p.id === state.landlord) this._drawLandlordBadge(p.x, p.y + H * 0.12)
+    })
+
+    if (state.landlord === 0) this._drawLandlordBadge(W * 0.08, H * 0.92)
+    if (state.landlord !== null && state.landlord !== undefined) {
+      ctx.fillStyle = '#ffe27b'
+      ctx.font = `bold ${H * 0.045}px sans-serif`
+      ctx.textAlign = 'center'
+      ctx.fillText(`地主：${state.landlord === 0 ? '玩家' : state.landlord === 1 ? 'AI左' : 'AI右'}`, W / 2, H * 0.18)
+    }
+
+    if (state.lastPlay && state.lastPlay.cards.length) {
+      const p = state.lastPlay.player
+      let x = W / 2 - 60, y = H * 0.34
+      if (p === 1) { x = W * 0.16; y = H * 0.28 }
+      if (p === 2) { x = W * 0.76; y = H * 0.28 }
+      this._drawMiniCards(state.lastPlay.cards, x, y)
+    }
+  }
+
+  _drawCalling(state) {
+    const ctx = this.ctx
+    const W = this.W, H = this.H
+    ctx.fillStyle = '#fff'
+    ctx.font = `bold ${H * 0.075}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    const turnName = state.callTurn === 0 ? '你' : state.callTurn === 1 ? 'AI左' : 'AI右'
+    ctx.fillText(`${turnName}叫分`, W / 2, H * 0.31)
+
+    if (state.callText[1]) ctx.fillText(state.callText[1], W * 0.22, H * 0.31)
+    if (state.callText[2]) ctx.fillText(state.callText[2], W * 0.78, H * 0.31)
+
+    if (state.callTurn !== 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.82)'
+      ctx.font = `bold ${H * 0.04}px sans-serif`
+      ctx.fillText('AI 思考中...', W / 2, H * 0.48)
+      return
+    }
+
+    const labels = ['不叫', '1分', '2分', '3分']
+    const bw = W * 0.14, bh = H * 0.1
+    const gap = W * 0.045
+    const sx = (W - bw * labels.length - gap * (labels.length - 1)) / 2
+    labels.forEach((label, i) => {
+      const x = sx + i * (bw + gap)
+      const y = H * 0.47
+      const grad = ctx.createLinearGradient(x, y, x, y + bh)
+      grad.addColorStop(0, i === 0 ? '#8fa4f0' : '#ffd474')
+      grad.addColorStop(1, i === 0 ? '#596fd1' : '#e99a2a')
+      ctx.fillStyle = grad
+      this._roundRect(x, y, bw, bh, 6)
+      ctx.fill()
+      ctx.fillStyle = '#fff'
+      ctx.font = `bold ${H * 0.055}px sans-serif`
+      ctx.fillText(label, x + bw / 2, y + bh / 2)
+      this.landlordActionBtns.push({ id: `bid-${i}`, x, y, w: bw, h: bh })
+    })
+  }
+
+  _drawPlayHud(state) {
+    const ctx = this.ctx
+    const W = this.W, H = this.H
+    const isPlayerTurn = state.currentPlayer === 0
+    ctx.fillStyle = isPlayerTurn ? '#fff' : 'rgba(255,255,255,0.78)'
+    ctx.font = `bold ${H * 0.045}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.fillText(isPlayerTurn ? '请选择手牌出牌' : 'AI 出牌中...', W / 2, H * 0.5)
+    if (!isPlayerTurn) return
+
+    const labels = [
+      { id: 'pass', text: '不出', color: '#6377d8' },
+      { id: 'hint', text: '提示', color: '#3aaed8' },
+      { id: 'play', text: '出牌', color: '#f0a738' },
+    ]
+    const bw = W * 0.1, bh = H * 0.08, gap = W * 0.025
+    const sx = (W - bw * labels.length - gap * 2) / 2
+    labels.forEach((btn, i) => {
+      const x = sx + i * (bw + gap)
+      const y = H * 0.62
+      ctx.fillStyle = btn.color
+      this._roundRect(x, y, bw, bh, 6)
+      ctx.fill()
+      ctx.fillStyle = '#fff'
+      ctx.font = `bold ${H * 0.04}px sans-serif`
+      ctx.fillText(btn.text, x + bw / 2, y + bh / 2)
+      this.landlordActionBtns.push({ id: btn.id, x, y, w: bw, h: bh })
+    })
+  }
+
+  _drawLandlordResult(state) {
+    const ctx = this.ctx
+    const W = this.W, H = this.H
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+    ctx.fillRect(0, 0, W, H)
+    const mw = W * 0.32, mh = H * 0.38
+    const mx = (W - mw) / 2, my = (H - mh) / 2
+    ctx.fillStyle = '#fff5d6'
+    this._roundRect(mx, my, mw, mh, 12)
+    ctx.fill()
+    ctx.strokeStyle = '#f4bf45'
+    ctx.lineWidth = 3
+    this._roundRect(mx, my, mw, mh, 12)
+    ctx.stroke()
+    ctx.fillStyle = state.resultWin ? '#d6412f' : '#3551b8'
+    ctx.font = `bold ${H * 0.08}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(state.resultWin ? '成功' : '失败', W / 2, my + mh * 0.35)
+    ctx.fillStyle = '#2f2b22'
+    ctx.font = `bold ${H * 0.04}px sans-serif`
+    ctx.fillText('再来一局', W / 2, my + mh * 0.72)
+    this.landlordActionBtns.push({ id: 'again', x: mx + mw * 0.23, y: my + mh * 0.58, w: mw * 0.54, h: mh * 0.25 })
+  }
+
+  _drawBottomCards(cards, revealed) {
+    const W = this.W, H = this.H
+    const cw = H * 0.075, ch = cw * 1.35
+    const sx = W / 2 - cw * 1.65
+    cards.forEach((card, i) => {
+      const x = sx + i * cw * 1.1
+      const y = H * 0.03
+      if (revealed) this._drawCard(card, x, y, cw, ch)
+      else this._drawCardBack(x, y, cw, ch)
+    })
+  }
+
+  _drawHand(hand, selected) {
+    const W = this.W, H = this.H
+    const cw = Math.min(H * 0.17, W / 13)
+    const ch = cw * 1.35
+    const overlap = Math.min(cw * 0.58, (W * 0.86 - cw) / Math.max(1, hand.length - 1))
+    const totalW = cw + overlap * (hand.length - 1)
+    const sx = (W - totalW) / 2
+    const yBase = H - ch - H * 0.055
+    hand.forEach((card, i) => {
+      const selectedUp = selected.includes(i)
+      const x = sx + i * overlap
+      const y = yBase - (selectedUp ? H * 0.035 : 0)
+      this._drawCard(card, x, y, cw, ch)
+      this.landlordHandRects.push({ index: i, x, y: yBase - H * 0.05, w: cw, h: ch + H * 0.06 })
+    })
+  }
+
+  _drawMiniCards(cards, x, y) {
+    const cw = this.H * 0.07, ch = cw * 1.35
+    cards.forEach((card, i) => this._drawCard(card, x + i * cw * 0.55, y, cw, ch))
+  }
+
+  _drawCard(card, x, y, w, h) {
+    const ctx = this.ctx
+    ctx.fillStyle = '#f7f7f2'
+    this._roundRect(x, y, w, h, 5)
+    ctx.fill()
+    ctx.strokeStyle = '#d4d4d4'
+    ctx.lineWidth = 1
+    this._roundRect(x, y, w, h, 5)
+    ctx.stroke()
+    const color = card.red ? '#bd251f' : '#171717'
+    ctx.fillStyle = color
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'top'
+    ctx.font = `bold ${w * 0.34}px serif`
+    const rank = card.label || card.rank
+    ctx.fillText(rank, x + w * 0.12, y + h * 0.08)
+    ctx.font = `${w * 0.34}px serif`
+    ctx.fillText(card.joker ? '★' : card.suit, x + w * 0.13, y + h * 0.34)
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'bottom'
+    ctx.font = `${w * 0.42}px serif`
+    ctx.fillText(card.joker ? '★' : card.suit, x + w * 0.88, y + h * 0.9)
+  }
+
+  _drawCardBack(x, y, w, h) {
+    const ctx = this.ctx
+    ctx.fillStyle = '#f1f5f7'
+    this._roundRect(x, y, w, h, 5)
+    ctx.fill()
+    ctx.fillStyle = '#4b91b8'
+    this._roundRect(x + 4, y + 4, w - 8, h - 8, 4)
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'
+    ctx.lineWidth = 1
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath()
+      ctx.moveTo(x + 8 + i * w * 0.16, y + 7)
+      ctx.lineTo(x + w - 8, y + h - 8 - i * h * 0.12)
+      ctx.stroke()
+    }
+  }
+
+  _drawLandlordBadge(cx, cy) {
+    const ctx = this.ctx
+    ctx.fillStyle = '#172b62'
+    this._roundRect(cx - 36, cy - 14, 72, 28, 14)
+    ctx.fill()
+    ctx.fillStyle = '#ffd968'
+    ctx.font = 'bold 18px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('地主', cx, cy)
   }
 
   // 将屏幕坐标转换为棋盘格子坐标

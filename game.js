@@ -1,15 +1,19 @@
 import Renderer from './js/render.js'
 import { getAIMove, checkWin, BOARD_SIZE } from './js/ai.js'
+import { dealCards, estimateBid, sortHand, takeCards, takeAiCards } from './js/landlord.js'
 
 // 获取屏幕尺寸（兼容各版本基础库）
-const sysInfo = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
-const W = sysInfo.windowWidth
-const H = sysInfo.windowHeight
+function getWindowSize() {
+  const sysInfo = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
+  return { W: sysInfo.windowWidth, H: sysInfo.windowHeight }
+}
+
+const initialSize = getWindowSize()
 
 // 创建全屏 Canvas
 const canvas = wx.createCanvas()
-canvas.width = W
-canvas.height = H
+canvas.width = initialSize.W
+canvas.height = initialSize.H
 const ctx = canvas.getContext('2d')
 
 // ========== 游戏状态 ==========
@@ -25,10 +29,37 @@ let playerFirst = true
 let showModal = true
 let showResult = false
 let resultText = ''
+let currentGame = 'menu'
+let landlord = null
+let landlordTimer = null
 
 const diffLabels = { easy: '初出茅庐', medium: '登堂入室', hard: '炉火纯青' }
 
 const renderer = new Renderer(canvas, ctx)
+
+function resizeCanvas() {
+  const { W, H } = getWindowSize()
+  canvas.width = W
+  canvas.height = H
+  renderer.resize(W, H)
+}
+
+function setGameOrientation(value) {
+  if (wx.setDeviceOrientation) {
+    wx.setDeviceOrientation({ value })
+  }
+  setTimeout(() => {
+    resizeCanvas()
+    render()
+  }, 260)
+}
+
+if (wx.onWindowResize) {
+  wx.onWindowResize(() => {
+    resizeCanvas()
+    render()
+  })
+}
 
 // ========== 初始化棋盘 ==========
 function initBoard() {
@@ -39,8 +70,16 @@ function initBoard() {
 
 // ========== 渲染 ==========
 function render() {
-  if (showMainMenu) {
+  if (currentGame === 'menu' || showMainMenu) {
     renderer.drawMainMenu()
+    return
+  }
+  if (currentGame === 'landlordStart') {
+    renderer.drawLandlordStart()
+    return
+  }
+  if (currentGame === 'landlord') {
+    renderer.drawLandlordGame(landlord)
     return
   }
   renderer.draw(board, currentTurn, playerColor, diffLabels[difficulty], gameOver)
@@ -114,6 +153,7 @@ function undo() {
 
 // ========== 开始游戏 ==========
 function startGame() {
+  currentGame = 'gomoku'
   playerColor = playerFirst ? 1 : 2
   aiColor = playerFirst ? 2 : 1
   currentTurn = 1  // 黑棋先走
@@ -136,10 +176,20 @@ wx.onTouchStart((e) => {
   // 主界面交互
   if (showMainMenu) {
     if (renderer.mainMenuBtn && renderer.hitTest(x, y, renderer.mainMenuBtn)) {
+      currentGame = 'gomoku'
+      setGameOrientation('portrait')
       showMainMenu = false
       showModal = true
       render()
     }
+    if (renderer.landlordMenuBtn && renderer.hitTest(x, y, renderer.landlordMenuBtn)) {
+      enterLandlordStart()
+    }
+    return
+  }
+
+  if (currentGame === 'landlordStart' || currentGame === 'landlord') {
+    handleLandlordTouch(x, y)
     return
   }
 
@@ -215,6 +265,7 @@ function handleModalTouch(x, y) {
 function handleFooterBtn(id) {
   switch (id) {
     case 'exit':
+      currentGame = 'menu'
       showMainMenu = true
       showModal = false
       showResult = false
@@ -233,6 +284,223 @@ function handleFooterBtn(id) {
       render()
       break
   }
+}
+
+// ========== 斗地主 ==========
+function clearLandlordTimer() {
+  if (landlordTimer) {
+    clearTimeout(landlordTimer)
+    landlordTimer = null
+  }
+}
+
+function enterLandlordStart() {
+  currentGame = 'landlordStart'
+  showMainMenu = false
+  showModal = false
+  showResult = false
+  landlord = null
+  clearLandlordTimer()
+  setGameOrientation('landscape')
+  render()
+}
+
+function exitLandlordToMenu() {
+  clearLandlordTimer()
+  landlord = null
+  currentGame = 'menu'
+  showMainMenu = true
+  showModal = false
+  showResult = false
+  setGameOrientation('portrait')
+  render()
+}
+
+function startLandlordRound() {
+  clearLandlordTimer()
+  const dealt = dealCards()
+  landlord = {
+    phase: 'call',
+    hands: dealt.hands,
+    bottomCards: dealt.bottomCards,
+    selected: [],
+    landlord: null,
+    currentBid: 0,
+    highestBidder: null,
+    callTurn: 0,
+    callsMade: 0,
+    callText: ['', '', ''],
+    currentPlayer: null,
+    lastPlay: null,
+    resultWin: false,
+  }
+  currentGame = 'landlord'
+  render()
+}
+
+function handleLandlordTouch(x, y) {
+  if (renderer.landlordExitBtn && renderer.hitTest(x, y, renderer.landlordExitBtn)) {
+    exitLandlordToMenu()
+    return
+  }
+  if (currentGame === 'landlordStart') {
+    if (renderer.landlordStartBtn && renderer.hitTest(x, y, renderer.landlordStartBtn)) {
+      startLandlordRound()
+    }
+    return
+  }
+
+  if (!landlord) return
+  if (landlord.phase === 'result') {
+    const btn = findLandlordButton(x, y)
+    if (btn && btn.id === 'again') startLandlordRound()
+    return
+  }
+  if (landlord.phase === 'call') {
+    const btn = findLandlordButton(x, y)
+    if (btn && btn.id.startsWith('bid-') && landlord.callTurn === 0) {
+      playerBid(Number(btn.id.slice(4)))
+    }
+    return
+  }
+  if (landlord.phase !== 'play' || landlord.currentPlayer !== 0) return
+
+  for (let i = renderer.landlordHandRects.length - 1; i >= 0; i--) {
+    const rect = renderer.landlordHandRects[i]
+    if (renderer.hitTest(x, y, rect)) {
+      toggleSelectedCard(rect.index)
+      return
+    }
+  }
+  const btn = findLandlordButton(x, y)
+  if (!btn) return
+  if (btn.id === 'hint') selectHintCard()
+  if (btn.id === 'pass') playerPass()
+  if (btn.id === 'play') playerPlaySelected()
+}
+
+function findLandlordButton(x, y) {
+  if (!renderer.landlordActionBtns) return null
+  return renderer.landlordActionBtns.find(btn => renderer.hitTest(x, y, btn))
+}
+
+function playerBid(score) {
+  if (!landlord || landlord.phase !== 'call' || landlord.callTurn !== 0) return
+  applyBid(0, score)
+}
+
+function applyBid(player, score) {
+  landlord.callText[player] = score > 0 ? `${score}分` : '不叫'
+  if (score > landlord.currentBid) {
+    landlord.currentBid = score
+    landlord.highestBidder = player
+  }
+  landlord.callsMade++
+  render()
+
+  if (score === 3) {
+    landlordTimer = setTimeout(() => becomeLandlord(player), 450)
+    return
+  }
+  if (landlord.callsMade >= 3) {
+    landlordTimer = setTimeout(() => {
+      if (landlord.highestBidder === null) startLandlordRound()
+      else becomeLandlord(landlord.highestBidder)
+    }, 650)
+    return
+  }
+  landlord.callTurn = (landlord.callTurn + 1) % 3
+  render()
+  if (landlord.callTurn !== 0) scheduleAiBid()
+}
+
+function scheduleAiBid() {
+  clearLandlordTimer()
+  landlordTimer = setTimeout(() => {
+    if (!landlord || landlord.phase !== 'call' || landlord.callTurn === 0) return
+    const raw = estimateBid(landlord.hands[landlord.callTurn])
+    const bid = raw > landlord.currentBid ? raw : 0
+    applyBid(landlord.callTurn, bid)
+  }, 700)
+}
+
+function becomeLandlord(player) {
+  if (!landlord) return
+  landlord.landlord = player
+  landlord.hands[player].push(...landlord.bottomCards)
+  sortHand(landlord.hands[player])
+  landlord.phase = 'play'
+  landlord.currentPlayer = player
+  landlord.selected = []
+  landlord.lastPlay = null
+  render()
+  if (player !== 0) scheduleAiPlay()
+}
+
+function toggleSelectedCard(index) {
+  const selected = landlord.selected
+  const pos = selected.indexOf(index)
+  if (pos >= 0) selected.splice(pos, 1)
+  else selected.push(index)
+  render()
+}
+
+function selectHintCard() {
+  if (!landlord || landlord.hands[0].length === 0) return
+  landlord.selected = [landlord.hands[0].length - 1]
+  render()
+}
+
+function playerPass() {
+  if (!landlord || landlord.currentPlayer !== 0) return
+  landlord.selected = []
+  landlord.lastPlay = { player: 0, cards: [] }
+  nextLandlordTurn()
+}
+
+function playerPlaySelected() {
+  if (!landlord || landlord.currentPlayer !== 0) return
+  if (landlord.selected.length === 0) {
+    selectHintCard()
+    return
+  }
+  const cards = takeCards(landlord.hands[0], landlord.selected)
+  landlord.selected = []
+  landlord.lastPlay = { player: 0, cards }
+  if (landlord.hands[0].length === 0) {
+    finishLandlordRound(true)
+    return
+  }
+  nextLandlordTurn()
+}
+
+function nextLandlordTurn() {
+  landlord.currentPlayer = (landlord.currentPlayer + 1) % 3
+  render()
+  if (landlord.currentPlayer !== 0) scheduleAiPlay()
+}
+
+function scheduleAiPlay() {
+  clearLandlordTimer()
+  landlordTimer = setTimeout(() => {
+    if (!landlord || landlord.phase !== 'play' || landlord.currentPlayer === 0) return
+    const player = landlord.currentPlayer
+    const cards = takeAiCards(landlord.hands[player])
+    landlord.lastPlay = { player, cards }
+    if (landlord.hands[player].length === 0) {
+      finishLandlordRound(false)
+      return
+    }
+    nextLandlordTurn()
+  }, 850)
+}
+
+function finishLandlordRound(playerWon) {
+  landlord.phase = 'result'
+  landlord.resultWin = playerWon
+  landlord.selected = []
+  clearLandlordTimer()
+  render()
 }
 
 // ========== 启动 ==========
